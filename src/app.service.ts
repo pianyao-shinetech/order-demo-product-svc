@@ -1,22 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { parse as papaParse } from 'papaparse'
-import { db as mongodb } from './utils/db'
-import { PurchaseProductEvent } from './types/purchase-product.event';
-import { QueryDTO } from './types/query';
-import { ProductPageDTO } from './types/product_page';
-import { ProductDTO, ProductDetailDTO } from './types/product';
-import { ProductDetailSchema, ProductSchema } from './types/product_schema';
+import { parse as papaParse } from 'papaparse';
+import { db as mongodb } from './utils/db';
+import { PurchaseProductEvent } from './types/purchase_product.event';
+import { QueryMessage } from './types/query.msg';
+import { ProductPageDTO } from './types/product_page.dto';
+import { ProductDTO, ProductDetailDTO } from './types/product.dto';
+import { ProductDetailSchema, ProductSchema } from './types/product.schema';
 
 const sampleVideoUrl: string = 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 const coldStart = false;
 
 @Injectable()
 export class AppService {
-  private products: Array<ProductDTO> = [];
-
-  getHello(): string {
-    return 'Hello World!';
-  }
 
     /**
    * read csv file
@@ -89,9 +84,10 @@ export class AppService {
     })
   }
   
-  async listProducts(query: QueryDTO):Promise<ProductPageDTO> {
+  async listProducts(query: QueryMessage):Promise<ProductPageDTO> {
     console.log('listProducts - PRODUCT', JSON.stringify(query));
     let total = 0;
+    let products: Array<ProductDTO> = [];
     if (coldStart) {
       const productDetails = await this.parseFile('./sample_data/dataset_amazon-bestsellers.csv');
       // console.log(this.productDetails);
@@ -107,7 +103,7 @@ export class AppService {
         productDetails.forEach(pd => new ProductDetailModel(pd).save());
       });
 
-      this.products = productDetails.map(detail => new ProductDTO(detail));
+      products = productDetails.map(detail => new ProductDTO(detail));
     } else {
       const conn = await mongodb.connect();
       const skipAggregation = {
@@ -153,11 +149,11 @@ export class AppService {
           limitAggregation,
         ]);
         total = result.length > 0 ? result[0].meta.count.total : 0;
-        this.products = result.map(detail => new ProductDTO(detail));
+        products = result.map(detail => new ProductDTO(detail));
       } else {
         const Product = conn.model('Product', ProductSchema, 'products');
         total = await Product.countDocuments({});
-        this.products = await Product.aggregate([
+        products = await Product.aggregate([
           {
             $sort: { 'published_date': -1 }
           },
@@ -180,9 +176,14 @@ export class AppService {
     return {
       page_num: query.page_num,
       page_size: query.page_size,
-      page_data: this.products,
+      page_data: products,
       total: total,
     };
+  }
+
+  // TODO
+  async checkStock(query: QueryMessage):Promise<Array<Number>> {
+    return [];
   }
 
   async getProductByID(id: string):Promise<ProductDetailDTO | null> {

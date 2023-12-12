@@ -1,4 +1,4 @@
-import { ProductDTO } from './product';
+import { ProductDTO } from './product.dto';
 
 export class ProductPageDTO {
     page_num: number;
